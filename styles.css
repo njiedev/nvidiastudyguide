@@ -1,0 +1,241 @@
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;--surface3:#242424;
+  --border:#2a2a2a;--border-hover:#3a3a3a;
+  --text:#e8e8e8;--text-dim:#888;--text-dimmer:#555;
+  --green:#76b900;--green-dim:#76b90030;--green-glow:#76b90015;
+  --amber:#f59e0b;--amber-dim:#f59e0b25;
+  --red:#ef4444;--red-dim:#ef444425;
+  --blue:#3b82f6;--blue-dim:#3b82f625;
+  --purple:#a855f7;--purple-dim:#a855f720;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'DM Sans',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  line-height:1.6;min-height:100vh;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* Top bar */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  padding:12px 24px;display:flex;align-items:center;justify-content:space-between;
+  backdrop-filter:blur(20px);
+}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.nvidia-badge{
+  background:var(--green);color:#000;font-weight:700;font-size:11px;
+  padding:3px 8px;border-radius:3px;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;
+}
+.topbar h1{font-size:15px;font-weight:600;color:var(--text-dim)}
+.progress-bar-container{
+  display:flex;align-items:center;gap:12px;
+}
+.progress-ring{width:36px;height:36px;position:relative}
+.progress-ring svg{transform:rotate(-90deg)}
+.progress-ring circle{fill:none;stroke-width:3}
+.progress-ring .bg{stroke:var(--border)}
+.progress-ring .fill{stroke:var(--green);stroke-linecap:round;transition:stroke-dashoffset .5s ease}
+.progress-pct{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--green);
+}
+.progress-label{font-size:12px;color:var(--text-dim)}
+
+/* Nav */
+.nav{
+  display:flex;gap:4px;padding:12px 24px;overflow-x:auto;
+  border-bottom:1px solid var(--border);background:var(--surface);
+  -ms-overflow-style:none;scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{
+  background:none;border:1px solid transparent;color:var(--text-dim);
+  padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer;
+  white-space:nowrap;transition:all .2s;font-family:'DM Sans',sans-serif;
+}
+.nav-btn:hover{color:var(--text);background:var(--surface2)}
+.nav-btn.active{color:var(--green);border-color:var(--green);background:var(--green-dim)}
+
+/* Layout */
+.container{max-width:900px;margin:0 auto;padding:24px}
+
+/* Sections */
+.section{display:none;animation:fadeIn .3s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Cards */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:20px;margin-bottom:16px;
+  transition:border-color .2s;
+}
+.card:hover{border-color:var(--border-hover)}
+
+/* Phase header */
+.phase-header{margin-bottom:20px}
+.phase-label{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--green);letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:6px;
+}
+.phase-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.phase-meta{font-size:13px;color:var(--text-dim)}
+.phase-domains{
+  display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;
+}
+.domain-tag{
+  font-size:11px;padding:3px 10px;border-radius:100px;
+  font-family:'JetBrains Mono',monospace;
+}
+.domain-tag.core{background:var(--green-dim);color:var(--green)}
+.domain-tag.data{background:var(--blue-dim);color:var(--blue)}
+.domain-tag.exp{background:var(--purple-dim);color:var(--purple)}
+.domain-tag.dev{background:var(--amber-dim);color:var(--amber)}
+.domain-tag.trust{background:var(--red-dim);color:var(--red)}
+
+/* Subsection labels */
+.sub-label{
+  font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1.5px;color:var(--text-dimmer);
+  margin:20px 0 10px;padding-bottom:6px;
+  border-bottom:1px solid var(--border);
+}
+.sub-label:first-child{margin-top:0}
+
+/* Checklist items */
+.check-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:10px 12px;margin:4px 0;border-radius:8px;
+  transition:background .15s;cursor:pointer;
+  position:relative;
+}
+.check-item:hover{background:var(--surface2)}
+.check-item.completed .check-text{color:var(--text-dim);text-decoration:line-through;text-decoration-color:var(--text-dimmer)}
+.check-item.completed .check-meta{color:var(--text-dimmer)}
+
+.check-box{
+  width:20px;height:20px;min-width:20px;border:2px solid var(--border-hover);
+  border-radius:5px;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;margin-top:2px;
+}
+.check-item.completed .check-box{
+  background:var(--green);border-color:var(--green);
+}
+.check-box svg{width:12px;height:12px;opacity:0;transition:opacity .2s}
+.check-item.completed .check-box svg{opacity:1}
+
+.check-content{flex:1;min-width:0}
+.check-text{font-size:14px;font-weight:500;transition:all .3s}
+.check-meta{font-size:12px;color:var(--text-dim);margin-top:2px;transition:color .3s}
+.check-meta a{color:var(--green);text-decoration:none}
+.check-meta a:hover{text-decoration:underline}
+
+.check-tag{
+  font-size:10px;padding:2px 7px;border-radius:4px;
+  font-family:'JetBrains Mono',monospace;font-weight:500;
+  white-space:nowrap;margin-top:2px;
+}
+.tag-dli{background:var(--green-dim);color:var(--green)}
+.tag-free{background:var(--blue-dim);color:var(--blue)}
+.tag-paper{background:var(--purple-dim);color:var(--purple)}
+.tag-video{background:var(--amber-dim);color:var(--amber)}
+.tag-read{background:var(--red-dim);color:var(--red)}
+
+/* Exam info grid */
+.info-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;margin-bottom:24px;
+}
+.info-cell{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:14px;
+}
+.info-cell .label{font-size:11px;color:var(--text-dimmer);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:'JetBrains Mono',monospace}
+.info-cell .value{font-size:15px;font-weight:600}
+
+/* Concept list */
+.concept-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+@media(max-width:600px){.concept-grid{grid-template-columns:1fr}}
+.concept-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;background:var(--surface2);border-radius:6px;
+  font-size:13px;
+}
+.concept-num{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--green);font-weight:700;min-width:20px;
+}
+
+/* Trap cards */
+.trap-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 12px;margin:4px 0;
+  font-size:13px;color:var(--text-dim);
+}
+.trap-icon{color:var(--amber);font-size:14px;min-width:18px;margin-top:1px}
+
+/* Cheat sheet styles */
+.cheat-category{
+  font-size:14px;font-weight:700;color:var(--green);
+  margin:18px 0 8px;
+}
+.cheat-category:first-child{margin-top:0}
+.cheat-item{
+  font-size:13px;color:var(--text-dim);
+  padding:4px 0 4px 16px;position:relative;
+}
+.cheat-item::before{
+  content:'›';position:absolute;left:4px;color:var(--text-dimmer);
+}
+
+/* NVIDIA tools table */
+.tools-table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+.tools-table th{
+  text-align:left;padding:8px 12px;border-bottom:2px solid var(--green);
+  color:var(--green);font-family:'JetBrains Mono',monospace;font-size:11px;
+  text-transform:uppercase;letter-spacing:1px;
+}
+.tools-table td{
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  color:var(--text-dim);
+}
+.tools-table td:first-child{color:var(--text);font-weight:600}
+
+/* Cost table */
+.cost-table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+.cost-table th{
+  text-align:left;padding:8px 12px;border-bottom:2px solid var(--border);
+  color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;
+}
+.cost-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text-dim)}
+.cost-table tr:last-child td{border-bottom:2px solid var(--green);color:var(--green);font-weight:700}
+
+/* Reset button */
+.reset-btn{
+  background:none;border:1px solid var(--border);color:var(--text-dim);
+  padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:all .2s;
+}
+.reset-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Section progress */
+.section-progress{
+  display:flex;align-items:center;gap:8px;margin-bottom:16px;
+}
+.section-progress-bar{
+  flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;
+}
+.section-progress-fill{
+  height:100%;background:var(--green);border-radius:2px;
+  transition:width .5s ease;
+}
+.section-progress-text{
+  font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;
+  min-width:45px;text-align:right;
+}

@@ -55,9 +55,9 @@ const sections = [
     items:[
       {id:'p1-alammar',text:'Read The Illustrated Transformer by Jay Alammar',meta:'Blog · ~1 hour · <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank">jalammar.github.io</a>',tag:'free',tagLabel:'FREE'},
       {id:'p1-dli',text:'Complete DLI: Getting Started With Deep Learning',meta:'Self-paced · 8 hours · $90 (scholarship) · <a href="https://learn.nvidia.com/courses/course-detail?course_id=course-v1:DLI+S-FX-01+V1" target="_blank">learn.nvidia.com</a>',tag:'dli',tagLabel:'DLI'},
-      {id:'p1-karpathy1',text:'Watch Karpathy Lecture 1: Backpropagation / Micrograd',meta:'YouTube · ~2.5 hours · <a href="https://karpathy.ai/zero-to-hero.html" target="_blank">karpathy.ai</a>',tag:'video',tagLabel:'VIDEO'},
-      {id:'p1-karpathy7',text:'Watch Karpathy Lecture 7: Building GPT from Scratch',meta:'YouTube · ~2 hours · <a href="https://karpathy.ai/zero-to-hero.html" target="_blank">karpathy.ai</a>',tag:'video',tagLabel:'VIDEO'},
-      {id:'p1-3b1b',text:'Watch 3Blue1Brown: Neural Networks playlist',meta:'YouTube · ~1 hour · <a href="https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi" target="_blank">youtube.com</a>',tag:'video',tagLabel:'VIDEO'},
+      {id:'p1-karpathy1',text:'Watch Karpathy Lecture 1: Backpropagation / Micrograd',meta:'YouTube · ~2.5 hours · <a href="https://www.youtube.com/watch?v=VMj-3S1tku0" target="_blank">youtube.com</a>',tag:'video',tagLabel:'VIDEO',embedUrl:'https://www.youtube.com/embed/VMj-3S1tku0'},
+      {id:'p1-karpathy7',text:'Watch Karpathy Lecture 7: Building GPT from Scratch',meta:'YouTube · ~2 hours · <a href="https://www.youtube.com/watch?v=kCc8FmEb1nY" target="_blank">youtube.com</a>',tag:'video',tagLabel:'VIDEO',embedUrl:'https://www.youtube.com/embed/kCc8FmEb1nY'},
+      {id:'p1-3b1b',text:'Watch 3Blue1Brown: Neural Networks playlist',meta:'YouTube · ~1 hour · <a href="https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi" target="_blank">youtube.com</a>',tag:'video',tagLabel:'VIDEO',embedUrl:'https://www.youtube.com/embed/videoseries?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi'},
       {id:'p1-paper',text:'Read "Attention Is All You Need" (sections 1–3)',meta:'Paper · ~1 hour · <a href="https://arxiv.org/abs/1706.03762" target="_blank">arxiv.org</a>',tag:'paper',tagLabel:'PAPER'},
       {id:'p1-annotated',text:'Optional: Read The Annotated Transformer',meta:'Tutorial · ~2 hours · <a href="https://nlp.seas.harvard.edu/2018/04/03/attention.html" target="_blank">nlp.seas.harvard.edu</a>',tag:'paper',tagLabel:'PAPER'},
     ],
@@ -304,10 +304,13 @@ const sections = [
 // ─── State ───
 const STORAGE_KEY = 'ncagenl-checked';
 const ACTIVE_SECTION_KEY = 'ncagenl-active-section';
+const NOTES_KEY = 'ncagenl-notes';
 let checked = {};
+let notes = {};
 let activeSection = 'overview';
 
 try { checked = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch(e) {}
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') } catch(e) {}
 try {
   const savedSection = localStorage.getItem(ACTIVE_SECTION_KEY);
   if (sections.some(section => section.id === savedSection)) activeSection = savedSection;
@@ -319,6 +322,22 @@ function save() {
 
 function saveActiveSection() {
   try { localStorage.setItem(ACTIVE_SECTION_KEY, activeSection) } catch(e) {}
+}
+
+function saveNotes() {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)) } catch(e) {}
+}
+
+function escapeAttr(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function hasNotes(id) {
+  return !!(notes[id] && notes[id].trim());
 }
 
 function getAllCheckIds() {
@@ -369,21 +388,56 @@ function toggleCheck(id) {
   updateProgress();
 }
 
+function saveResourceNote(id, value) {
+  notes[id] = value;
+  if (!notes[id].trim()) delete notes[id];
+  saveNotes();
+  const button = document.querySelector(`[data-notes-button="${id}"]`);
+  if (button) button.classList.toggle('has-notes', hasNotes(id));
+}
+
+function toggleResourcePanel(id) {
+  const panel = document.getElementById('resource-panel-' + id);
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+}
+
+function renderResourcePanel(item) {
+  if (!item.embedUrl) return '';
+  return `
+    <div class="resource-panel" id="resource-panel-${item.id}" hidden onclick="event.stopPropagation()">
+      <div class="video-frame">
+        <iframe src="${item.embedUrl}" title="${escapeAttr(item.text)}" loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen></iframe>
+      </div>
+      <label class="notes-label" for="notes-${item.id}">Lecture notes</label>
+      <textarea class="notes-box" id="notes-${item.id}" placeholder="Capture key ideas, formulas, timestamps, and exam traps..."
+        oninput="saveResourceNote('${item.id}', this.value)">${escapeHtml(notes[item.id])}</textarea>
+    </div>
+  `;
+}
+
 function renderCheckItem(item) {
   const done = checked[item.id] ? 'completed' : '';
   const tagHtml = item.tag ? `<span class="check-tag tag-${item.tag}">${item.tagLabel}</span>` : '';
+  const notesButton = item.embedUrl ? `<button class="notes-toggle ${hasNotes(item.id) ? 'has-notes' : ''}" data-notes-button="${item.id}" onclick="event.stopPropagation();toggleResourcePanel('${item.id}')">Notes</button>` : '';
   return `
-    <div class="check-item ${done}" data-id="${item.id}" onclick="toggleCheck('${item.id}')">
-      <div class="check-box">
-        <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
-          <path d="M2.5 6.5L5 9L9.5 3.5"/>
-        </svg>
+    <div class="resource-item">
+      <div class="check-item ${done}" data-id="${item.id}" onclick="toggleCheck('${item.id}')">
+        <div class="check-box">
+          <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
+            <path d="M2.5 6.5L5 9L9.5 3.5"/>
+          </svg>
+        </div>
+        <div class="check-content">
+          <div class="check-text">${item.text}</div>
+          ${item.meta ? `<div class="check-meta">${item.meta}</div>` : ''}
+        </div>
+        ${notesButton}
+        ${tagHtml}
       </div>
-      <div class="check-content">
-        <div class="check-text">${item.text}</div>
-        ${item.meta ? `<div class="check-meta">${item.meta}</div>` : ''}
-      </div>
-      ${tagHtml}
+      ${renderResourcePanel(item)}
     </div>
   `;
 }
@@ -448,7 +502,9 @@ function switchSection(id) {
 function resetAll() {
   if (!confirm('Reset all progress? This cannot be undone.')) return;
   checked = {};
+  notes = {};
   try { localStorage.removeItem(STORAGE_KEY) } catch(e) {}
+  try { localStorage.removeItem(NOTES_KEY) } catch(e) {}
   renderContent();
   document.querySelectorAll('.check-item').forEach(el => el.classList.remove('completed'));
   updateProgress();

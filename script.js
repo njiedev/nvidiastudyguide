@@ -284,7 +284,7 @@ const sections = [
           {id:'rc-8',text:'I know NIM, Triton, TensorRT-LLM, NeMo, Guardrails'},
           {id:'rc-9',text:'I can describe BLEU, ROUGE, and perplexity'},
           {id:'rc-10',text:'I understand bias, hallucination, and how RAG helps'},
-        ].map(item => renderCheckItem(item)).join('')}
+        ].map(item => renderCheckpointItem(item)).join('')}
         <div style="margin-top:16px;padding:12px;background:var(--green-dim);border-radius:8px;font-size:13px;color:var(--green)">
           8+ checked = book the exam. Fewer = study the gaps first.
         </div>
@@ -305,15 +305,23 @@ const sections = [
 const STORAGE_KEY = 'ncagenl-checked';
 const ACTIVE_SECTION_KEY = 'ncagenl-active-section';
 const NOTES_KEY = 'ncagenl-notes';
+const QUIZ_KEY = 'ncagenl-quiz-answers';
 let checked = {};
 let notes = {};
+let quizAnswers = {};
 let activeSection = 'overview';
+let activeResourceId = null;
 
 try { checked = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') } catch(e) {}
 try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') } catch(e) {}
+try { quizAnswers = JSON.parse(localStorage.getItem(QUIZ_KEY) || '{}') } catch(e) {}
 try {
   const savedSection = localStorage.getItem(ACTIVE_SECTION_KEY);
   if (sections.some(section => section.id === savedSection)) activeSection = savedSection;
+} catch(e) {}
+try {
+  const resourceId = window.location.hash.replace('#resource-', '');
+  if (resourceId && findResource(resourceId)) activeResourceId = resourceId;
 } catch(e) {}
 
 function save() {
@@ -328,6 +336,10 @@ function saveNotes() {
   try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)) } catch(e) {}
 }
 
+function saveQuizAnswers() {
+  try { localStorage.setItem(QUIZ_KEY, JSON.stringify(quizAnswers)) } catch(e) {}
+}
+
 function escapeAttr(value) {
   return String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
@@ -338,6 +350,26 @@ function escapeHtml(value) {
 
 function hasNotes(id) {
   return !!(notes[id] && notes[id].trim());
+}
+
+function stripHtml(value) {
+  const div = document.createElement('div');
+  div.innerHTML = value || '';
+  return div.textContent || div.innerText || '';
+}
+
+function findResource(id) {
+  for (const section of sections) {
+    if (!section.items) continue;
+    const item = section.items.find(resource => resource.id === id);
+    if (item) return { item, section };
+  }
+  return null;
+}
+
+function getResourceUrl(item) {
+  const match = (item.meta || '').match(/href="([^"]+)"/);
+  return match ? match[1] : '';
 }
 
 function getAllCheckIds() {
@@ -392,28 +424,175 @@ function saveResourceNote(id, value) {
   notes[id] = value;
   if (!notes[id].trim()) delete notes[id];
   saveNotes();
-  const button = document.querySelector(`[data-notes-button="${id}"]`);
-  if (button) button.classList.toggle('has-notes', hasNotes(id));
 }
 
-function toggleResourcePanel(id) {
-  const panel = document.getElementById('resource-panel-' + id);
-  if (!panel) return;
-  panel.hidden = !panel.hidden;
+function getMiniQuiz(item, section) {
+  const title = item.text.toLowerCase();
+  if (title.includes('transformer') || title.includes('attention')) {
+    return [
+      {q:'What does self-attention let a transformer do?',options:['Compare each token with other tokens in the same sequence','Store hidden state one token at a time','Replace tokenization with character lookup'],answer:0,why:'Self-attention scores relationships across tokens in the input sequence.'},
+      {q:'In scaled dot-product attention, why is the QK score divided by the square root of d_k?',options:['To keep logits from becoming too large','To remove positional encoding','To make the model decoder-only'],answer:0,why:'Scaling stabilizes the softmax when key/query dimensions are large.'},
+      {q:'How is positional encoding combined with token embeddings in the original transformer?',options:['It is added to the embeddings','It replaces the embeddings','It is concatenated after attention'],answer:0,why:'A classic exam trap: positional encoding is added, not concatenated.'}
+    ];
+  }
+  if (title.includes('backprop') || title.includes('micrograd') || title.includes('neural networks')) {
+    return [
+      {q:'What does backpropagation compute?',options:['Gradients of the loss with respect to parameters','The final class label directly','The train/test split'],answer:0,why:'Backprop uses the chain rule to compute gradients for learning.'},
+      {q:'What does gradient descent do after gradients are computed?',options:['Updates weights in a direction that reduces loss','Deletes low-value neurons','Converts FP32 weights to INT8'],answer:0,why:'Gradients guide the parameter update step.'},
+      {q:'Which activation is commonly used in hidden layers?',options:['ReLU','BLEU','ROUGE'],answer:0,why:'ReLU is a common hidden-layer activation; BLEU and ROUGE are metrics.'}
+    ];
+  }
+  if (title.includes('pandas') || title.includes('machine learning') || title.includes('xgboost')) {
+    return [
+      {q:'Why use cross-validation?',options:['To estimate model performance across multiple data splits','To make every model a neural network','To embed text into vectors'],answer:0,why:'Cross-validation gives a more robust estimate than one split.'},
+      {q:'What kind of task is mean squared error most associated with?',options:['Regression','Text generation','Named entity recognition'],answer:0,why:'MSE is a common regression loss/metric.'},
+      {q:'What is XGBoost?',options:['A gradient-boosted tree method','A tokenizer used by BERT','A transformer decoder block'],answer:0,why:'XGBoost is tree-based and often strong on tabular data.'}
+    ];
+  }
+  if (title.includes('rapids') || title.includes('cudf') || title.includes('networkx')) {
+    return [
+      {q:'What is cuDF closest to?',options:['GPU-accelerated pandas','A vector database','A model alignment method'],answer:0,why:'cuDF brings a pandas-like dataframe API to GPUs.'},
+      {q:'What is cuML closest to?',options:['GPU-accelerated scikit-learn','A prompt template format','A tokenizer vocabulary'],answer:0,why:'cuML maps common ML algorithms to GPU workflows.'},
+      {q:'When is RAPIDS most useful?',options:['Large data workflows that benefit from GPU acceleration','Tiny static websites','Manual note taking only'],answer:0,why:'RAPIDS is about faster GPU data science and analytics.'}
+    ];
+  }
+  if (title.includes('hugging face') || title.includes('transformer-based nlp')) {
+    return [
+      {q:'Which model family is encoder-only?',options:['BERT','GPT','T5'],answer:0,why:'BERT is encoder-only and is common for classification, NER, and embeddings.'},
+      {q:'Which model family is decoder-only?',options:['GPT','BERT','RAPIDS'],answer:0,why:'GPT-style models are decoder-only and used for generation.'},
+      {q:'What does pipeline() help with in Hugging Face Transformers?',options:['Quickly running common NLP tasks','Serving multi-model inference only','Creating CUDA kernels'],answer:0,why:'pipeline() is a high-level API for common model tasks.'}
+    ];
+  }
+  if (title.includes('prompt') || title.includes('langchain') || title.includes('rag')) {
+    return [
+      {q:'What is the core idea of RAG?',options:['Retrieve relevant context before generating an answer','Train every model from scratch','Remove embeddings from the app'],answer:0,why:'RAG grounds generation in retrieved documents.'},
+      {q:'When is few-shot prompting useful?',options:['When examples clarify the desired behavior','When you have no context window','When you need GPU dataframe acceleration'],answer:0,why:'Few-shot prompts use examples to steer the model.'},
+      {q:'In LangChain, what is an agent?',options:['An LLM-driven loop that can choose tools','A fixed SQL table','A tokenizer normalization step'],answer:0,why:'Agents select actions/tools based on the task.'}
+    ];
+  }
+  if (title.includes('lora') || title.includes('rlhf') || title.includes('fine-tuning') || title.includes('llms')) {
+    return [
+      {q:'Why is LoRA parameter-efficient?',options:['It trains small adapter matrices while keeping base weights frozen','It removes all attention heads','It replaces tokenization'],answer:0,why:'LoRA avoids updating the full model.'},
+      {q:'What is RLHF used for?',options:['Aligning model behavior with human preferences','Accelerating pandas on GPUs','Measuring summarization overlap'],answer:0,why:'RLHF uses human preference feedback for alignment.'},
+      {q:'What is a practical benefit of quantization?',options:['Lower memory use and faster inference','Perfect accuracy on every benchmark','Automatic data cleaning'],answer:0,why:'Lower precision can improve serving efficiency.'}
+    ];
+  }
+  if (title.includes('nvidia') || title.includes('nim') || title.includes('triton') || title.includes('trustworthy') || title.includes('guardrails')) {
+    return [
+      {q:'What does NVIDIA NIM provide?',options:['Containerized model deployment/inference microservices','A handwritten math proof engine','A CPU-only spreadsheet app'],answer:0,why:'NIM packages optimized inference into deployable services.'},
+      {q:'What is NeMo Guardrails for?',options:['Constraining and guiding chatbot behavior','Replacing all evaluation metrics','Training gradient-boosted trees'],answer:0,why:'Guardrails define safety and behavior rules around LLM apps.'},
+      {q:'Which is a trustworthy AI concern?',options:['Fairness and transparency','Negative letter spacing','CSS border radius'],answer:0,why:'Fairness, transparency, accountability, privacy, and safety are core themes.'}
+    ];
+  }
+  if (title.includes('bert')) {
+    return [
+      {q:'What type of transformer is BERT?',options:['Encoder-only','Decoder-only','GPU dataframe library'],answer:0,why:'BERT is an encoder-only transformer.'},
+      {q:'What tokenizer is associated with BERT?',options:['WordPiece','BPE only','SentencePiece only'],answer:0,why:'BERT is commonly associated with WordPiece tokenization.'},
+      {q:'What is BERT often used for?',options:['Classification, NER, and embeddings','Autoregressive text generation only','Serving NIM containers'],answer:0,why:'Encoder models are strong for understanding tasks.'}
+    ];
+  }
+  return [
+    {q:`What is the main study goal for ${item.text}?`,options:['Connect the resource to exam concepts and practice explaining it','Memorize only the URL','Skip the topic if it feels familiar'],answer:0,why:'The tracker is meant to convert each resource into exam-ready understanding.'},
+    {q:'What should your notes capture?',options:['Key terms, examples, mistakes, and exam traps','Only the course price','Only whether the page loaded'],answer:0,why:'Useful notes preserve the ideas you will need later.'},
+    {q:`Which phase does this resource support?`,options:[section.title,'Exam checkout only','Browser styling'],answer:0,why:`This resource belongs to ${section.title}.`}
+  ];
 }
 
-function renderResourcePanel(item) {
-  if (!item.embedUrl) return '';
+function saveQuizAnswer(resourceId, questionIndex, optionIndex) {
+  if (!quizAnswers[resourceId]) quizAnswers[resourceId] = {};
+  quizAnswers[resourceId][questionIndex] = optionIndex;
+  saveQuizAnswers();
+  renderContent();
+}
+
+function renderQuiz(item, section) {
+  const quiz = getMiniQuiz(item, section);
+  const answers = quizAnswers[item.id] || {};
+  const answered = quiz.filter((_, index) => answers[index] !== undefined);
+  const correct = quiz.filter((question, index) => answers[index] === question.answer).length;
   return `
-    <div class="resource-panel" id="resource-panel-${item.id}" hidden onclick="event.stopPropagation()">
-      <div class="video-frame">
-        <iframe src="${item.embedUrl}" title="${escapeAttr(item.text)}" loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen></iframe>
+    <div class="card">
+      <div class="sub-label">Mini Quiz</div>
+      <div class="quiz-score">${correct}/${quiz.length} correct · ${answered.length}/${quiz.length} answered</div>
+      ${quiz.map((question, questionIndex) => {
+        const selected = answers[questionIndex];
+        return `
+          <div class="quiz-question">
+            <div class="quiz-prompt">${questionIndex + 1}. ${question.q}</div>
+            <div class="quiz-options">
+              ${question.options.map((option, optionIndex) => {
+                const isSelected = selected === optionIndex;
+                const showResult = selected !== undefined;
+                const isCorrect = question.answer === optionIndex;
+                const state = showResult && isSelected ? (isCorrect ? 'correct' : 'wrong') : '';
+                const reveal = showResult && isCorrect ? 'correct' : '';
+                return `<button class="quiz-option ${state || reveal}" onclick="saveQuizAnswer('${item.id}', ${questionIndex}, ${optionIndex})">${option}</button>`;
+              }).join('')}
+            </div>
+            ${selected !== undefined ? `<div class="quiz-feedback">${question.why}</div>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderResourceDetail(resourceId) {
+  const result = findResource(resourceId);
+  if (!result) {
+    activeResourceId = null;
+    return '';
+  }
+  const { item, section } = result;
+  const done = checked[item.id] ? 'completed' : '';
+  const tagHtml = item.tag ? `<span class="check-tag tag-${item.tag}">${item.tagLabel}</span>` : '';
+  const resourceUrl = getResourceUrl(item);
+  return `
+    <div class="resource-detail">
+      <button class="back-btn" onclick="switchSection('${section.id}')">← Back to ${section.label}</button>
+      <div class="phase-header resource-hero">
+        <div class="phase-label">${section.phase || 'RESOURCE'}</div>
+        <div class="phase-title">${item.text}</div>
+        <div class="phase-meta">${stripHtml(item.meta)}</div>
+        <div class="resource-actions">
+          <button class="detail-check ${done}" onclick="toggleCheck('${item.id}');renderContent()">
+            <span class="check-box">
+              <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
+                <path d="M2.5 6.5L5 9L9.5 3.5"/>
+              </svg>
+            </span>
+            ${checked[item.id] ? 'Completed' : 'Mark complete'}
+          </button>
+          ${tagHtml}
+        </div>
       </div>
-      <label class="notes-label" for="notes-${item.id}">Lecture notes</label>
-      <textarea class="notes-box" id="notes-${item.id}" placeholder="Capture key ideas, formulas, timestamps, and exam traps..."
-        oninput="saveResourceNote('${item.id}', this.value)">${escapeHtml(notes[item.id])}</textarea>
+
+      <div class="card">
+        <div class="sub-label">${item.embedUrl ? 'Lecture' : 'Resource'}</div>
+        ${item.embedUrl ? `
+          <div class="video-frame detail-video">
+            <iframe src="${item.embedUrl}" title="${escapeAttr(item.text)}" loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen></iframe>
+          </div>
+        ` : `
+          <div class="resource-link-card">
+            <div>
+              <div class="resource-link-title">${item.text}</div>
+              <div class="resource-link-meta">${stripHtml(item.meta)}</div>
+            </div>
+            ${resourceUrl ? `<a href="${resourceUrl}" target="_blank" onclick="event.stopPropagation()">Open resource</a>` : ''}
+          </div>
+        `}
+      </div>
+
+      <div class="card">
+        <div class="sub-label">Notes</div>
+        <textarea class="notes-box detail-notes" id="notes-${item.id}" placeholder="Capture key ideas, formulas, timestamps, and exam traps..."
+          oninput="saveResourceNote('${item.id}', this.value)">${escapeHtml(notes[item.id])}</textarea>
+      </div>
+
+      ${renderQuiz(item, section)}
     </div>
   `;
 }
@@ -421,23 +600,38 @@ function renderResourcePanel(item) {
 function renderCheckItem(item) {
   const done = checked[item.id] ? 'completed' : '';
   const tagHtml = item.tag ? `<span class="check-tag tag-${item.tag}">${item.tagLabel}</span>` : '';
-  const notesButton = item.embedUrl ? `<button class="notes-toggle ${hasNotes(item.id) ? 'has-notes' : ''}" data-notes-button="${item.id}" onclick="event.stopPropagation();toggleResourcePanel('${item.id}')">Notes</button>` : '';
+  const notesMarker = hasNotes(item.id) ? '<span class="notes-marker">NOTES</span>' : '';
   return `
     <div class="resource-item">
-      <div class="check-item ${done}" data-id="${item.id}" onclick="toggleCheck('${item.id}')">
-        <div class="check-box">
+      <div class="check-item resource-row ${done}" data-id="${item.id}" onclick="openResource('${item.id}')">
+        <button class="check-box check-button" onclick="event.stopPropagation();toggleCheck('${item.id}')" aria-label="Toggle ${escapeAttr(item.text)}">
           <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
             <path d="M2.5 6.5L5 9L9.5 3.5"/>
           </svg>
-        </div>
+        </button>
         <div class="check-content">
           <div class="check-text">${item.text}</div>
-          ${item.meta ? `<div class="check-meta">${item.meta}</div>` : ''}
+          ${item.meta ? `<div class="check-meta">${stripHtml(item.meta)}</div>` : ''}
         </div>
-        ${notesButton}
+        ${notesMarker}
         ${tagHtml}
       </div>
-      ${renderResourcePanel(item)}
+    </div>
+  `;
+}
+
+function renderCheckpointItem(item) {
+  const done = checked[item.id] ? 'completed' : '';
+  return `
+    <div class="check-item ${done}" data-id="${item.id}" onclick="toggleCheck('${item.id}')">
+      <div class="check-box">
+        <svg viewBox="0 0 12 12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round">
+          <path d="M2.5 6.5L5 9L9.5 3.5"/>
+        </svg>
+      </div>
+      <div class="check-content">
+        <div class="check-text">${item.text}</div>
+      </div>
     </div>
   `;
 }
@@ -466,7 +660,7 @@ function renderPhaseSection(s) {
   }
   if (s.checkpoints) {
     html += `<div class="card"><div class="sub-label">✓ Self-Test Checkpoint</div>`;
-    s.checkpoints.forEach(cp => html += renderCheckItem(cp));
+    s.checkpoints.forEach(cp => html += renderCheckpointItem(cp));
     html += `</div>`;
   }
   return html;
@@ -482,6 +676,11 @@ function renderNav() {
 
 function renderContent() {
   const container = document.getElementById('content');
+  if (activeResourceId) {
+    container.innerHTML = renderResourceDetail(activeResourceId);
+    updateProgress();
+    return;
+  }
   container.innerHTML = sections.map(s => {
     const content = s.render ? s.render() : renderPhaseSection(s);
     return `<div class="section ${s.id === activeSection ? 'active' : ''}" id="section-${s.id}">${content}</div>`;
@@ -489,13 +688,30 @@ function renderContent() {
   updateProgress();
 }
 
+function openResource(id) {
+  const result = findResource(id);
+  if (!result) return;
+  activeResourceId = id;
+  activeSection = result.section.id;
+  saveActiveSection();
+  window.location.hash = 'resource-' + id;
+  renderNav();
+  renderContent();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function switchSection(id) {
+  activeResourceId = null;
+  if (window.location.hash) history.pushState('', document.title, window.location.pathname + window.location.search);
   activeSection = id;
   saveActiveSection();
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.nav-btn[onclick="switchSection('${id}')"]`).classList.add('active');
+  const navButton = document.querySelector(`.nav-btn[onclick="switchSection('${id}')"]`);
+  if (navButton) navButton.classList.add('active');
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.getElementById('section-' + id).classList.add('active');
+  const section = document.getElementById('section-' + id);
+  if (section) section.classList.add('active');
+  renderContent();
   updateProgress();
 }
 
@@ -503,12 +719,21 @@ function resetAll() {
   if (!confirm('Reset all progress? This cannot be undone.')) return;
   checked = {};
   notes = {};
+  quizAnswers = {};
   try { localStorage.removeItem(STORAGE_KEY) } catch(e) {}
   try { localStorage.removeItem(NOTES_KEY) } catch(e) {}
+  try { localStorage.removeItem(QUIZ_KEY) } catch(e) {}
   renderContent();
   document.querySelectorAll('.check-item').forEach(el => el.classList.remove('completed'));
   updateProgress();
 }
+
+window.addEventListener('hashchange', () => {
+  const resourceId = window.location.hash.replace('#resource-', '');
+  activeResourceId = resourceId && findResource(resourceId) ? resourceId : null;
+  renderNav();
+  renderContent();
+});
 
 renderNav();
 renderContent();
